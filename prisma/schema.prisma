@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  type       OrderType @default(MARKET)
+  tokenIn    String    @map("token_in")
+  tokenOut   String    @map("token_out")
+  amount     Decimal   @db.Decimal(20, 8)
+  slippage   Decimal   @default(0.01) @db.Decimal(5, 4)
+  limitPrice Decimal?  @map("limit_price") @db.Decimal(20, 8)
+
+  status        OrderStatus @default(PENDING)
+  dex           String?
+  executedPrice Decimal?    @map("executed_price") @db.Decimal(20, 8)
+  txHash        String?     @map("tx_hash")
+  error         String?
+  retryCount    Int         @default(0) @map("retry_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLogs OrderAuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([dex])
+  @@map("orders")
+}
+
+model OrderAuditLog {
+  id              Int       @id @default(autoincrement())
+  orderId         String    @map("order_id")
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  oldStatus       OrderStatus? @map("old_status")
+  newStatus       OrderStatus  @map("new_status")
+  metadata        Json?
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("order_audit_logs")
+}
+
+enum OrderStatus {
+  PENDING
+  ROUTING
+  BUILDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  
+  @@map("order_status_enum")
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  SNIPER
+  
+  @@map("order_type_enum")
+}
